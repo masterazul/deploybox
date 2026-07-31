@@ -83,7 +83,7 @@ fn handle(mut client: TcpStream, routes: &HashMap<String, u16>) -> std::io::Resu
     let target = host_label(&head).and_then(|label| routes.get(&label).copied());
     let Some(upstream_port) = target else {
         let _ = client.write_all(
-            b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 14\r\nConnection: close\r\n\r\nno such preview",
+            b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 15\r\nConnection: close\r\n\r\nno such preview",
         );
         return Ok(());
     };
