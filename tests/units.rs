@@ -1,6 +1,46 @@
 use deploybox::docker::parse_ps;
 use deploybox::proxy::{content_length, host_label, rewrite_head};
+use deploybox::state::{self, Preview};
 use deploybox::util::slug;
+
+fn preview(name: &str, port: u16) -> Preview {
+    Preview {
+        name: name.to_string(),
+        container: format!("deploybox-{name}"),
+        image: "img:latest".to_string(),
+        port,
+        container_port: 80,
+        created_at: 1,
+    }
+}
+
+#[test]
+fn upsert_replaces_entry_by_name() {
+    let mut previews = Vec::new();
+    state::upsert(&mut previews, preview("web", 8100));
+    state::upsert(&mut previews, preview("web", 8200));
+    assert_eq!(previews.len(), 1);
+    assert_eq!(previews[0].port, 8200);
+}
+
+#[test]
+fn save_then_load_round_trips() {
+    let mut path = std::env::temp_dir();
+    path.push(format!("deploybox-state-{}.json", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+
+    let previews = vec![preview("api", 8100), preview("web", 8200)];
+    state::save(&path, &previews).unwrap();
+    let loaded = state::load(&path);
+
+    assert_eq!(loaded.len(), 2);
+    assert_eq!(loaded[0].name, "api");
+    assert_eq!(loaded[0].port, 8100);
+    assert_eq!(loaded[1].name, "web");
+    assert_eq!(loaded[1].container_port, 80);
+
+    let _ = std::fs::remove_file(&path);
+}
 
 #[test]
 fn slugify_names() {
