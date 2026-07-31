@@ -1,5 +1,10 @@
 # deploybox
 
+[![CI](https://github.com/masterazul/deploybox/actions/workflows/ci.yml/badge.svg)](https://github.com/masterazul/deploybox/actions/workflows/ci.yml)
+[![Security](https://github.com/masterazul/deploybox/actions/workflows/security.yml/badge.svg)](https://github.com/masterazul/deploybox/actions/workflows/security.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Rust](https://img.shields.io/badge/rust-2021-orange.svg)
+
 Spin up a throwaway preview of any repo with one command. `deploybox` builds the
 Dockerfile, runs it on a free port, tracks it, and can reverse-proxy every preview under
 a single host — a tiny self-hosted take on preview deployments.
@@ -40,7 +45,8 @@ deploybox up --image traefik/whoami --name who --container-port 80
 - `down` removes the container and the record.
 
 The bundled proxy is intentionally small (HTTP/1.1, one request per connection, forces
-`Connection: close`); put a real proxy in front for production traffic.
+`Connection: close`) but forwards request bodies, so `POST`/`PUT` to an API preview work,
+not just static `GET`s. Put a real proxy in front for production traffic.
 
 ## License
 
