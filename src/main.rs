@@ -49,6 +49,22 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
         .map(String::as_str)
 }
 
+fn first_positional(args: &[String]) -> Option<&String> {
+    let value_flags = ["--name", "--container-port", "--image", "--port"];
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if value_flags.contains(&arg.as_str()) {
+            i += 2;
+        } else if arg.starts_with("--") {
+            i += 1;
+        } else {
+            return Some(arg);
+        }
+    }
+    None
+}
+
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -57,7 +73,7 @@ fn now() -> u64 {
 }
 
 fn up(args: &[String]) -> ExitCode {
-    let path = args.iter().find(|a| !a.starts_with("--"));
+    let path = first_positional(args);
     let image_flag = flag(args, "--image");
     if path.is_none() && image_flag.is_none() {
         return fail("up needs a <path> or --image <ref>");
@@ -147,7 +163,7 @@ fn ls() -> ExitCode {
 }
 
 fn down(args: &[String]) -> ExitCode {
-    let Some(name) = args.iter().find(|a| !a.starts_with("--")) else {
+    let Some(name) = first_positional(args) else {
         return fail("down needs a <name>");
     };
     let path = state::default_path();
@@ -184,4 +200,27 @@ fn run_proxy(args: &[String]) -> ExitCode {
 fn fail(message: &str) -> ExitCode {
     eprintln!("error: {message}");
     ExitCode::FAILURE
+}
+
+#[cfg(test)]
+mod tests {
+    use super::first_positional;
+
+    fn args(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn first_positional_skips_flag_values() {
+        assert_eq!(
+            first_positional(&args(&["--name", "web", "./app"])).unwrap(),
+            "./app"
+        );
+        assert_eq!(
+            first_positional(&args(&["./app", "--name", "web"])).unwrap(),
+            "./app"
+        );
+        assert_eq!(first_positional(&args(&["--image", "traefik/whoami"])), None);
+        assert!(first_positional(&args(&[])).is_none());
+    }
 }
