@@ -17,6 +17,16 @@ pub fn host_label(head: &str) -> Option<String> {
     None
 }
 
+pub fn content_length(head: &str) -> Option<usize> {
+    for line in head.split("\r\n") {
+        let lower = line.to_ascii_lowercase();
+        if let Some(rest) = lower.strip_prefix("content-length:") {
+            return rest.trim().parse().ok();
+        }
+    }
+    None
+}
+
 pub fn rewrite_head(head: &str) -> String {
     let mut kept: Vec<&str> = head
         .split("\r\n")
@@ -81,6 +91,21 @@ fn handle(mut client: TcpStream, routes: &HashMap<String, u16>) -> std::io::Resu
     let mut upstream = TcpStream::connect(("127.0.0.1", upstream_port))?;
     upstream.write_all(rewrite_head(&head).as_bytes())?;
     upstream.write_all(body)?;
+
+    if let Some(total) = content_length(&head) {
+        let mut remaining = total.saturating_sub(body.len());
+        let mut chunk = [0u8; 4096];
+        while remaining > 0 {
+            let n = client.read(&mut chunk)?;
+            if n == 0 {
+                break;
+            }
+            let take = n.min(remaining);
+            upstream.write_all(&chunk[..take])?;
+            remaining -= take;
+        }
+    }
+
     std::io::copy(&mut upstream, &mut client)?;
     Ok(())
 }

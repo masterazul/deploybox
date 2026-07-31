@@ -1,5 +1,5 @@
 use deploybox::docker::parse_ps;
-use deploybox::proxy::{host_label, rewrite_head};
+use deploybox::proxy::{content_length, host_label, rewrite_head};
 use deploybox::util::slug;
 
 #[test]
@@ -28,6 +28,14 @@ fn rewrite_head_forces_close() {
     assert!(lower.contains("connection: close"));
     assert!(!lower.contains("keep-alive"));
     assert!(out.ends_with("\r\n\r\n"));
+}
+
+#[test]
+fn reads_content_length() {
+    let head = "POST /x HTTP/1.1\r\nHost: a.localhost\r\nContent-Length: 42\r\nAccept: */*";
+    assert_eq!(content_length(head), Some(42));
+    assert_eq!(content_length("GET / HTTP/1.1\r\nHost: a.localhost"), None);
+    assert_eq!(content_length("POST / HTTP/1.1\r\nContent-Length: nope"), None);
 }
 
 #[test]
