@@ -27,11 +27,12 @@ pub fn default_path() -> PathBuf {
     .join("state.json")
 }
 
-pub fn load(path: &Path) -> Vec<Preview> {
-    std::fs::read(path)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_default()
+pub fn load(path: &Path) -> Result<Vec<Preview>, String> {
+    match std::fs::read(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(e.to_string()),
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| e.to_string()),
+    }
 }
 
 pub fn save(path: &Path, previews: &[Preview]) -> Result<(), String> {

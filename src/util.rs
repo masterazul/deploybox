@@ -20,6 +20,7 @@ pub fn slug(input: &str) -> String {
     }
 }
 
-pub fn free_port(start: u16, end: u16) -> Option<u16> {
-    (start..=end).find(|&port| TcpListener::bind(("127.0.0.1", port)).is_ok())
+pub fn free_port(start: u16, end: u16, taken: &[u16]) -> Option<u16> {
+    (start..=end)
+        .find(|port| !taken.contains(port) && TcpListener::bind(("127.0.0.1", *port)).is_ok())
 }

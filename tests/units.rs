@@ -31,7 +31,7 @@ fn save_then_load_round_trips() {
 
     let previews = vec![preview("api", 8100), preview("web", 8200)];
     state::save(&path, &previews).unwrap();
-    let loaded = state::load(&path);
+    let loaded = state::load(&path).unwrap();
 
     assert_eq!(loaded.len(), 2);
     assert_eq!(loaded[0].name, "api");

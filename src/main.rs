@@ -106,12 +106,25 @@ fn up(args: &[String]) -> ExitCode {
         }
     };
 
+    let path_state = state::default_path();
+    let mut previews = match state::load(&path_state) {
+        Ok(list) => list,
+        Err(e) => return fail(&format!("state: {e}")),
+    };
+
     let host_port = match flag(args, "--port").and_then(|p| p.parse().ok()) {
         Some(p) => p,
-        None => match util::free_port(8100, 8999) {
-            Some(p) => p,
-            None => return fail("no free port in 8100-8999"),
-        },
+        None => {
+            let taken: Vec<u16> = previews
+                .iter()
+                .filter(|p| p.name != name)
+                .map(|p| p.port)
+                .collect();
+            match util::free_port(8100, 8999, &taken) {
+                Some(p) => p,
+                None => return fail("no free port in 8100-8999"),
+            }
+        }
     };
 
     let container = format!("deploybox-{name}");
@@ -121,8 +134,6 @@ fn up(args: &[String]) -> ExitCode {
         Err(e) => return fail(&format!("run failed: {e}")),
     };
 
-    let path_state = state::default_path();
-    let mut previews = state::load(&path_state);
     state::upsert(
         &mut previews,
         Preview {
@@ -145,7 +156,10 @@ fn up(args: &[String]) -> ExitCode {
 }
 
 fn ls() -> ExitCode {
-    let previews = state::load(&state::default_path());
+    let previews = match state::load(&state::default_path()) {
+        Ok(list) => list,
+        Err(e) => return fail(&format!("state: {e}")),
+    };
     let status: HashMap<String, String> = match docker::ps_raw() {
         Ok(raw) => docker::parse_ps(&raw)
             .into_iter()
@@ -173,7 +187,10 @@ fn down(args: &[String]) -> ExitCode {
         return fail("down needs a <name>");
     };
     let path = state::default_path();
-    let mut previews = state::load(&path);
+    let mut previews = match state::load(&path) {
+        Ok(list) => list,
+        Err(e) => return fail(&format!("state: {e}")),
+    };
     let Some(preview) = previews.iter().find(|p| &p.name == name).cloned() else {
         return fail(&format!("no preview named '{name}'"));
     };
@@ -192,7 +209,10 @@ fn run_proxy(args: &[String]) -> ExitCode {
     let port: u16 = flag(args, "--port")
         .and_then(|p| p.parse().ok())
         .unwrap_or(8080);
-    let previews = state::load(&state::default_path());
+    let previews = match state::load(&state::default_path()) {
+        Ok(list) => list,
+        Err(e) => return fail(&format!("state: {e}")),
+    };
     if previews.is_empty() {
         return fail("no previews to route");
     }
