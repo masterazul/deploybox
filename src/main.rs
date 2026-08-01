@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::ExitCode;
@@ -256,7 +258,10 @@ mod tests {
             first_positional(&args(&["./app", "--name", "web"])).unwrap(),
             "./app"
         );
-        assert_eq!(first_positional(&args(&["--image", "traefik/whoami"])), None);
+        assert_eq!(
+            first_positional(&args(&["--image", "traefik/whoami"])),
+            None
+        );
         assert!(first_positional(&args(&[])).is_none());
     }
 }
