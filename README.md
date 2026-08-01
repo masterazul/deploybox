@@ -5,11 +5,16 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Rust](https://img.shields.io/badge/rust-2021-orange.svg)
 
-Spin up a throwaway preview of any repo with one command. `deploybox` builds the
-Dockerfile, runs it on a free port, tracks it, and can reverse-proxy every preview under
-a single host — a tiny self-hosted take on preview deployments.
+```
+deploybox up .
+```
 
-It shells out to the `docker` CLI you already have; there is no daemon and no SDK.
+That builds the repo's Dockerfile and starts the container on a port nobody is using. Run
+`deploybox proxy` and every preview you have alive answers at `<name>.localhost`, through a
+reverse proxy written with nothing but the standard library.
+
+It drives the `docker` CLI already on your machine. No daemon to install, no SDK, no config
+file to fill in first.
 
 ## Build
 
@@ -47,6 +52,19 @@ deploybox up --image traefik/whoami --name who --container-port 80
 The bundled proxy is intentionally small (HTTP/1.1, one request per connection, forces
 `Connection: close`) but forwards request bodies, so `POST`/`PUT` to an API preview work,
 not just static `GET`s. Put a real proxy in front for production traffic.
+
+## Hardening
+
+The pipeline is scoped, not just green.
+
+- Actions run from a commit digest. A tag can be moved; a digest cannot.
+- Workflows declare `permissions: contents: read`, so `GITHUB_TOKEN` has nothing to write with.
+- `cargo audit --deny warnings` runs on every push and again weekly. Dependabot watches the
+  crates and the pinned digests alike.
+- `#![forbid(unsafe_code)]` on both crate roots — enforced by the compiler, not by habit.
+- Release builds keep overflow checks. Paired with `panic = "abort"`, an overflow stops the
+  process instead of wrapping into a wrong answer.
+- `gitleaks` reads the full history on every push.
 
 ## License
 
