@@ -49,16 +49,24 @@ pub fn serve(port: u16, routes: HashMap<String, u16>) -> std::io::Result<()> {
         "proxy on http://127.0.0.1:{port} routing {} preview(s) by <name>.localhost",
         routes.len()
     );
-    for stream in listener.incoming().flatten() {
-        let routes = routes.clone();
-        std::thread::spawn(move || {
-            let _ = handle(stream, &routes);
-        });
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                let routes = routes.clone();
+                std::thread::spawn(move || {
+                    let _ = handle(stream, &routes);
+                });
+            }
+            Err(e) => {
+                eprintln!("accept: {e}");
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
     }
-    Ok(())
 }
 
 fn handle(mut client: TcpStream, routes: &HashMap<String, u16>) -> std::io::Result<()> {
+    client.set_read_timeout(Some(std::time::Duration::from_secs(30)))?;
     let mut buf = Vec::new();
     let mut chunk = [0u8; 4096];
     let mut split = None;
@@ -77,6 +85,7 @@ fn handle(mut client: TcpStream, routes: &HashMap<String, u16>) -> std::io::Resu
     let Some(end) = split else {
         return Ok(());
     };
+    client.set_read_timeout(None)?;
     let head = String::from_utf8_lossy(&buf[..end]).to_string();
     let body = &buf[end + 4..];
 
@@ -88,7 +97,15 @@ fn handle(mut client: TcpStream, routes: &HashMap<String, u16>) -> std::io::Resu
         return Ok(());
     };
 
-    let mut upstream = TcpStream::connect(("127.0.0.1", upstream_port))?;
+    let mut upstream = match TcpStream::connect(("127.0.0.1", upstream_port)) {
+        Ok(stream) => stream,
+        Err(_) => {
+            let _ = client.write_all(
+                b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 16\r\nConnection: close\r\n\r\npreview is down\n",
+            );
+            return Ok(());
+        }
+    };
     upstream.write_all(rewrite_head(&head).as_bytes())?;
     upstream.write_all(body)?;
 
@@ -104,6 +121,13 @@ fn handle(mut client: TcpStream, routes: &HashMap<String, u16>) -> std::io::Resu
             upstream.write_all(&chunk[..take])?;
             remaining -= take;
         }
+    } else {
+        let mut reader = client.try_clone()?;
+        let mut writer = upstream.try_clone()?;
+        std::thread::spawn(move || {
+            let _ = std::io::copy(&mut reader, &mut writer);
+            let _ = writer.shutdown(std::net::Shutdown::Write);
+        });
     }
 
     std::io::copy(&mut upstream, &mut client)?;
