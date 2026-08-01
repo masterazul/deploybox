@@ -75,7 +75,10 @@ fn reads_content_length() {
     let head = "POST /x HTTP/1.1\r\nHost: a.localhost\r\nContent-Length: 42\r\nAccept: */*";
     assert_eq!(content_length(head), Some(42));
     assert_eq!(content_length("GET / HTTP/1.1\r\nHost: a.localhost"), None);
-    assert_eq!(content_length("POST / HTTP/1.1\r\nContent-Length: nope"), None);
+    assert_eq!(
+        content_length("POST / HTTP/1.1\r\nContent-Length: nope"),
+        None
+    );
 }
 
 #[test]
