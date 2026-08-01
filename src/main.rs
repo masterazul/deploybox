@@ -49,6 +49,12 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
         .map(String::as_str)
 }
 
+fn image_name(reference: &str) -> &str {
+    let base = reference.split('@').next().unwrap_or(reference);
+    let base = base.rsplit('/').next().unwrap_or(base);
+    base.split(':').next().unwrap_or(base)
+}
+
 fn first_positional(args: &[String]) -> Option<&String> {
     let value_flags = ["--name", "--container-port", "--image", "--port"];
     let mut i = 0;
@@ -80,7 +86,7 @@ fn up(args: &[String]) -> ExitCode {
     }
 
     let default_name = image_flag
-        .map(|i| i.split([':', '/']).next_back().unwrap_or(i))
+        .map(image_name)
         .or_else(|| path.and_then(|p| Path::new(p).file_name().and_then(|s| s.to_str())))
         .unwrap_or("app");
     let name = util::slug(flag(args, "--name").unwrap_or(default_name));
@@ -204,7 +210,17 @@ fn fail(message: &str) -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::first_positional;
+    use super::{first_positional, image_name};
+
+    #[test]
+    fn image_name_uses_the_repository_not_the_tag() {
+        assert_eq!(image_name("nginx:latest"), "nginx");
+        assert_eq!(image_name("redis:latest"), "redis");
+        assert_eq!(image_name("ghcr.io/org/app:v2"), "app");
+        assert_eq!(image_name("traefik/whoami"), "whoami");
+        assert_eq!(image_name("nginx@sha256:abc123"), "nginx");
+        assert_eq!(image_name("postgres"), "postgres");
+    }
 
     fn args(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
